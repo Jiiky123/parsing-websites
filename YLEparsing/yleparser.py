@@ -11,19 +11,11 @@ soup = BeautifulSoup(source, 'lxml')
 article = soup.find('div', class_='yle__article__listItem__textualContent')
 
 
-def split_words(object):
-    splitted_words = object.split(" ")
-    return splitted_words
-
-
-def most_used_words():
-    pass
-
-
 def parse_yle_articles():
     # create dataframe for content
     yle_articles = pd.DataFrame(columns=['date', 'title', 'lead', 'category'])
 
+    # lists for article pieces
     dates = []
     titles = []
     leads = []
@@ -45,17 +37,24 @@ def parse_yle_articles():
         category = soup.find(
             'span', class_=re.compile(r'yle__subject yle__borderColor')).text
 
+        # append lists
         dates.append(date)
         titles.append(title)
         leads.append(lead)
         categories.append(category)
 
+    # append everything to pd dataframe
     yle_articles['date'] = dates
     yle_articles['title'] = titles
     yle_articles['lead'] = leads
     yle_articles['category'] = categories
 
-    print(split_words(yle_articles['title']))
+    return yle_articles
 
 
-parse_yle_articles()
+def split_words(object):  # figure out how to split series of strings
+    pass
+
+
+def most_used_words(splitwords):  # count most used words (keywords)
+    pass
