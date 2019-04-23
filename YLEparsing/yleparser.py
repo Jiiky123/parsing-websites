@@ -7,8 +7,8 @@ import json
 import os
 os.chdir('D:/PythonProjektATOM/Git/Repositories/parsing-with-bs4/YLEparsing')
 
-# grab url and get source
-url = 'https://yle-fi-search.api.yle.fi/v1/search?app_id=hakuylefi_v2_prod&app_key=4c1422b466ee676e03c4ba9866c0921f&language=fi&limit=2000&offset=0&query=talous'
+# grab url and get source (notice in URL: limit, offset, query)
+url = 'https://yle-fi-search.api.yle.fi/v1/search?app_id=hakuylefi_v2_prod&app_key=4c1422b466ee676e03c4ba9866c0921f&language=fi&limit=1000&offset=0&query=talous'
 with urlopen(url) as response:
     source = response.read()
 
@@ -16,7 +16,7 @@ data = json.loads(source.decode('utf-8'))
 # print(json.dumps(data, indent=2))
 
 
-def article_df():
+def get_articles():
 
     # list of items in articles
     dates = []
@@ -64,6 +64,3 @@ def article_df():
     # finally save to excel
     talous_articles.to_excel('yle_articles.xlsx')
     print('saved as xlsx file')
-
-
-article_df()
