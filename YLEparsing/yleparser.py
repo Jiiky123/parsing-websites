@@ -8,7 +8,9 @@ import os
 os.chdir('D:/PythonProjektATOM/Git/Repositories/parsing-websites/YLEparsing')
 
 # grab url and get source (notice in URL: limit, offset, query)
-url = 'https://yle-fi-search.api.yle.fi/v1/search?app_id=hakuylefi_v2_prod&app_key=4c1422b466ee676e03c4ba9866c0921f&language=fi&limit=1000&offset=0&query=talous'
+search_word = 'politiikka'
+url = 'https://yle-fi-search.api.yle.fi/v1/search?app_id=hakuylefi_v2_prod&app_key=4c1422b466ee676e03c4ba9866c0921f&language=fi&limit=1000&offset=0&query={}'.format(
+    search_word)
 with urlopen(url) as response:
     source = response.read()
 
@@ -40,22 +42,22 @@ def get_articles():
         authors.append(author)
 
     # move everything to pandas dataframe
-    talous_articles = pd.DataFrame(
+    articles = pd.DataFrame(
         columns=['date', 'headline', 'lead', 'author'])
-    talous_articles.date = dates
-    talous_articles.headline = headlines
-    talous_articles.lead = leads
-    talous_articles.author = authors
+    articles.date = dates
+    articles.headline = headlines
+    articles.lead = leads
+    articles.author = authors
 
     # clean up data
-    talous_articles = talous_articles.drop_duplicates(subset='headline')
-    talous_articles.date = pd.to_datetime(
-        talous_articles.date, format='%Y-%m-%d', errors='coerce').dt.date
-    talous_articles.sort_values('date', inplace=True, ascending=False)
-    talous_articles.set_index('date', inplace=True)
+    articles = articles.drop_duplicates(subset='headline')
+    articles.date = pd.to_datetime(
+        articles.date, format='%Y-%m-%d', errors='coerce').dt.date
+    articles.sort_values('date', inplace=True, ascending=False)
+    articles.set_index('date', inplace=True)
 
     # finally save to excel
-    talous_articles.to_excel('yle_articles.xlsx')
+    articles.to_excel('yle_articles_{}.xlsx'.format(search_word))
     print('saved as xlsx file')
 
 
