@@ -18,7 +18,7 @@ data = json.loads(source.decode('utf-8'))
 # print(json.dumps(data, indent=2))
 
 
-def get_articles():
+def get_articles():  # -------------------------------------------------------
 
     # list of items in articles
     dates = []
@@ -58,7 +58,9 @@ def get_articles():
 
     # finally save to excel
     articles.to_excel('articleData/yle_articles_{}.xlsx'.format(search_word))
-    print('saved as xlsx file')
+    print('Saved as yle_articles_{}.xlsx'.format(search_word))
+    print('Shape: ', articles.shape)
 
 
+# ----------------------------------------------------------------------------
 get_articles()
