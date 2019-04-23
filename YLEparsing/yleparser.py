@@ -5,7 +5,7 @@ import re
 import pandas as pd
 import json
 import os
-os.chdir('D:/PythonProjektATOM/Git/Repositories/parsing-websites/YLEparsing')
+os.chdir('D:/PythonProjektATOM/Git/Repositories/parsing-websites/YLEparsing/')
 
 # grab url and get source (notice in URL: limit, offset, query)
 search_word = 'politiikka'
@@ -57,7 +57,7 @@ def get_articles():
     articles.set_index('date', inplace=True)
 
     # finally save to excel
-    articles.to_excel('yle_articles_{}.xlsx'.format(search_word))
+    articles.to_excel('articleData/yle_articles_{}.xlsx'.format(search_word))
     print('saved as xlsx file')
 
 
