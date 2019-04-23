@@ -5,7 +5,7 @@ import re
 import pandas as pd
 import json
 import os
-os.chdir('D:/PythonProjektATOM/Git/Repositories/parsing-with-bs4/YLEparsing')
+os.chdir('D:/PythonProjektATOM/Git/Repositories/parsing-websites/YLEparsing')
 
 # grab url and get source (notice in URL: limit, offset, query)
 url = 'https://yle-fi-search.api.yle.fi/v1/search?app_id=hakuylefi_v2_prod&app_key=4c1422b466ee676e03c4ba9866c0921f&language=fi&limit=1000&offset=0&query=talous'
@@ -32,8 +32,6 @@ def get_articles():
             author = ''.join(item['author'])
         except KeyError:
             print('data not found')
-        finally:  # continue loop even if not found
-            pass
 
         # append to lists
         dates.append(date)
@@ -56,11 +54,9 @@ def get_articles():
     talous_articles.sort_values('date', inplace=True, ascending=False)
     talous_articles.set_index('date', inplace=True)
 
-    # check dataframe
-    print(talous_articles.info())
-    print(talous_articles.isna().sum())
-    print(talous_articles.lead.head())
-
     # finally save to excel
     talous_articles.to_excel('yle_articles.xlsx')
     print('saved as xlsx file')
+
+
+get_articles()
