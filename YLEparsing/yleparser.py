@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 from urllib.request import urlopen
+import numpy as np
 import re
 import pandas as pd
 import json
@@ -97,7 +98,7 @@ def most_common_words(category):
 
 # WORD POPULARITY OVER TIME--------------------------------------------------
 
-def word_pop_over_time(category, word, color='b'):
+def word_pop_over_time(category, *words, c='b'):
     # grab a saved dataframe
     words_df = pd.read_excel('articleData/yle_articles_{}.xlsx'.format(category), index_col=0)
 
@@ -113,25 +114,38 @@ def word_pop_over_time(category, word, color='b'):
     words_overtime = pd.DataFrame(columns=['date', 'occurrences'])
 
     # loop through wordlists and count occurrence
-    for date, counth, countl in zip(words_df.index, words_df.headline, words_df.lead):
-        count1 = counth.count(word)
-        count2 = countl.count(word)
-        dates.append(date)
-        counts.append(count1 + count2)
+    for word in words:
+        for date, counth, countl in zip(words_df.index, words_df.headline, words_df.lead):
+            count1 = counth.count(word)
+            count2 = countl.count(word)
+            dates.append(date)
+            counts.append(count1 + count2)
 
-    # append pd dataframe and append lists
-    words_overtime.date = dates
-    words_overtime.occurrences = counts
-    words_overtime.set_index('date', inplace=True)
-    words_overtime = words_overtime.resample('Q').sum()  # d/W/M/Q/y
-    words_overtime.index = words_overtime.index.astype('O')
+        # append pd dataframe and append lists
+        words_overtime.date = dates
+        words_overtime.occurrences = counts
+        words_overtime.set_index('date', inplace=True)
+        words_overtime = words_overtime.resample('Q').sum()  # d/W/M/Q/y
+        words_overtime.index = words_overtime.index.astype('O')
 
-    # plot word popularity over time
-    plt.plot(words_overtime.index, words_overtime.occurrences,
-             label='\'{}\' occurrence'.format(word), c=color)
+        # plot current word in loop
+        plt.plot(words_overtime.index, words_overtime.occurrences,
+                 label='\'{}\''.format(word), c=c)
+
+        # empty lists & dataframe before looping over next word
+        dates = []
+        counts = []
+        words_overtime = pd.DataFrame(columns=['date', 'occurrences'])
+
+        # randomize plot color for next word
+        c = np.random.rand(3,)
 
     plt.legend()
+    plt.title('Word popularity over time')
     plt.tight_layout()
     plt.show()
 
 # ----------------------------------------------------------------------------
+
+
+word_pop_over_time('politiikka', 'soini', 'sipilä', 'hallitus')
