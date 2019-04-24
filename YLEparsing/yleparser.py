@@ -13,11 +13,11 @@ os.chdir('D:/PythonProjektATOM/Git/Repositories/parsing-websites/YLEparsing/')
 # GET ARTICLES AND CREATE DATAFRAME-----------------------------------------
 
 
-def get_articles(searchword, limit, offset=0):
+def get_articles(searchword, limit, offset=0, language='sv'):  # swe=sv fin=fi
 
     # grab url and get source (notice in URL: limit, offset, query)
-    url = 'https://yle-fi-search.api.yle.fi/v1/search?app_id=hakuylefi_v2_prod&app_key=4c1422b466ee676e03c4ba9866c0921f&language=fi&limit={}&offset={}&query={}'.format(
-        limit, offset, searchword)
+    url = 'https://yle-fi-search.api.yle.fi/v1/search?app_id=hakuylefi_v2_prod&app_key=4c1422b466ee676e03c4ba9866c0921f&language={}&limit={}&offset={}&query={}'.format(
+        language, limit, offset, searchword)
 
     with urlopen(url) as response:
         source = response.read()
@@ -76,7 +76,7 @@ def get_articles(searchword, limit, offset=0):
 
 # GET MOST COMMON WORDS BY SEARCHWORD------------------------------------------
 
-def most_common_words(category):
+def most_common_words(category, word=None):
     # import article df
     words_df = pd.read_excel('articleData/yle_articles_{}.xlsx'.format(category))
 
@@ -90,6 +90,10 @@ def most_common_words(category):
     # print out words most common
     print('Most common words in yle_articles_{}.xlsx:'.format(category))
     print('# of articles: ', len(words_df.headline))
+
+    if word is not None:
+        print('Your word \'{}\' got mentioned'.format(word), results.get(word), 'times')
+
     for item in results.most_common():
         print(item)
 
@@ -103,8 +107,8 @@ def word_pop_over_time(category, *words, c='b'):
     words_df = pd.read_excel('articleData/yle_articles_{}.xlsx'.format(category), index_col=0)
 
     # make everything lowercase and split strings into wordlists
-    words_df.headline = words_df.headline.str.lower().str.split()
-    words_df.lead = words_df.lead.astype(str).str.lower().str.split()
+    words_df.headline = words_df.headline.astype(str).str.lower()
+    words_df.lead = words_df.lead.astype(str).str.lower()
 
     # lists for needed objects
     dates = []
@@ -116,8 +120,8 @@ def word_pop_over_time(category, *words, c='b'):
     # loop through wordlists and count occurrence
     for word in words:
         for date, counth, countl in zip(words_df.index, words_df.headline, words_df.lead):
-            count1 = counth.count(word)
-            count2 = countl.count(word)
+            count1 = len(re.findall(r'\b{}\w*'.format(word), counth))
+            count2 = len(re.findall(r'\b{}\w*'.format(word), countl))
             dates.append(date)
             counts.append(count1 + count2)
 
@@ -131,6 +135,10 @@ def word_pop_over_time(category, *words, c='b'):
         # plot current word in loop
         plt.plot(words_overtime.index, words_overtime.occurrences,
                  label='\'{}\''.format(word), c=c)
+
+        # print out word occurrence
+        print('Your word \'{}\' got mentioned'.format(word),
+              words_overtime.occurrences.sum(), 'times')
 
         # empty lists & dataframe before looping over next word
         dates = []
@@ -148,4 +156,5 @@ def word_pop_over_time(category, *words, c='b'):
 # ----------------------------------------------------------------------------
 
 
-word_pop_over_time('politiikka', 'soini', 'sipilä', 'hallitus')
+# most_common_words('e-urheilu')
+word_pop_over_time('pietarsaari', 'riko', 'jaro')
