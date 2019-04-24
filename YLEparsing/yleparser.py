@@ -6,9 +6,10 @@ import pandas as pd
 import json
 import os
 from collections import Counter
+import matplotlib.pyplot as plt
 os.chdir('D:/PythonProjektATOM/Git/Repositories/parsing-websites/YLEparsing/')
 
-# Get articles and create article dataframe----------------------------------
+# GET ARTICLES AND CREATE DATAFRAME-----------------------------------------
 
 
 def get_articles(searchword, limit, offset=0):
@@ -20,7 +21,7 @@ def get_articles(searchword, limit, offset=0):
     with urlopen(url) as response:
         source = response.read()
 
-    # decode json file
+    # load and decode json file
     data = json.loads(source.decode('utf-8'))
 
     # lists of items we need from articles
@@ -72,7 +73,7 @@ def get_articles(searchword, limit, offset=0):
 
 # ----------------------------------------------------------------------------
 
-# Print out most common words-----------------------------------------------
+# GET MOST COMMON WORDS BY SEARCHWORD------------------------------------------
 def most_common_words(category):
     # import article df
     words_df = pd.read_excel('articleData/yle_articles_{}.xlsx'.format(category))
@@ -93,5 +94,48 @@ def most_common_words(category):
 
 # ----------------------------------------------------------------------------
 
-get_articles('pietarsaari', 20000)
-most_common_words('pietarsaari')
+# WORD POPULARITY OVER TIME--------------------------------------------------
+
+
+def word_pop_over_time(category, word, color='b'):
+    # grab a saved dataframe
+    words_df = pd.read_excel('articleData/yle_articles_{}.xlsx'.format(category), index_col=0)
+
+    # make everything lowercase and split strings into wordlists
+    words_df.headline = words_df.headline.str.lower().str.split()
+    words_df.lead = words_df.lead.astype(str).str.lower().str.split()
+
+    # lists for needed objects
+    dates = []
+    counts = []
+
+    # lists go in here when filled
+    words_overtime = pd.DataFrame(columns=['date', 'occurrences'])
+
+    # loop through wordlists and count occurrence
+    for date, counth, countl in zip(words_df.index, words_df.headline, words_df.lead):
+        count1 = counth.count(word)
+        count2 = countl.count(word)
+        dates.append(date)
+        counts.append(count1 + count2)
+
+    # append pd dataframe and append lists
+    words_overtime.date = dates
+    words_overtime.occurrences = counts
+    words_overtime.set_index('date', inplace=True)
+    words_overtime = words_overtime.resample('Q').sum()  # d/W/M/Q/y
+    words_overtime.index = words_overtime.index.astype('O')
+
+    # plot word popularity over time
+    plt.plot(words_overtime.index, words_overtime.occurrences,
+             label='\'{}\' occurrence'.format(word), c=color)
+
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+
+word_pop_over_time('talous', 'trump', color='r')
+# word_pop_over_time('talous', 'trump', color='r')
+
+# ----------------------------------------------------------------------------
