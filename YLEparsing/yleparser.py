@@ -74,6 +74,7 @@ def get_articles(searchword, limit, offset=0):
 # ----------------------------------------------------------------------------
 
 # GET MOST COMMON WORDS BY SEARCHWORD------------------------------------------
+
 def most_common_words(category):
     # import article df
     words_df = pd.read_excel('articleData/yle_articles_{}.xlsx'.format(category))
@@ -95,7 +96,6 @@ def most_common_words(category):
 # ----------------------------------------------------------------------------
 
 # WORD POPULARITY OVER TIME--------------------------------------------------
-
 
 def word_pop_over_time(category, word, color='b'):
     # grab a saved dataframe
@@ -133,9 +133,5 @@ def word_pop_over_time(category, word, color='b'):
     plt.legend()
     plt.tight_layout()
     plt.show()
-
-
-word_pop_over_time('talous', 'trump', color='r')
-# word_pop_over_time('talous', 'trump', color='r')
 
 # ----------------------------------------------------------------------------
