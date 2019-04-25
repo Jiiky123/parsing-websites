@@ -8,7 +8,6 @@ import json
 import os
 from collections import Counter
 import matplotlib.pyplot as plt
-os.chdir('D:/PythonProjektATOM/Git/Repositories/parsing-websites/YLEparsing/')
 
 # CLASS FUNCTIONS ------------------------------------------------------------
 
