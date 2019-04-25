@@ -36,7 +36,6 @@ os.chdir('D:/PythonProjektATOM/Git/Repositories/parsing-websites/YLEparsing/')
 class GetArticles:
 
     def __init__(searchword, search, limit=20000, offset=0, language='sv'):
-
         searchword.search = search
         searchword.limit = limit
         searchword.offset = offset
@@ -51,7 +50,6 @@ class GetArticles:
 
         # load and decode json file
         data = json.loads(source.decode('utf-8'))
-
         # lists of items we need from articles
         dates = []
         headlines = []
@@ -88,11 +86,8 @@ class GetArticles:
         articles.sort_values('date', inplace=True, ascending=False)
         articles.set_index('date', inplace=True)
 
+        # make dataframe accessible within class
         searchword.articles = articles
-
-        # # finally save to excel
-        # articles.to_excel('articleData/yle_articles_{}.xlsx'.format(searchword),
-        #                   sheet_name=searchword)
 
         # location and shape
         print('Articles with searchword {}'.format(searchword.search))
