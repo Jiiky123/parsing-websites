@@ -191,7 +191,6 @@ class GetArticles:
 
 
 sport_artiklar = GetArticles('sport')
-sport_artiklar.save_excel(
-    'lol', 'D:/PythonProjektATOM/Git/Repositories/parsing-websites/YLEparsing/articleData/')
-# sport_artiklar.most_common_words('fotboll')
-# sport_artiklar.word_over_time('fotboll', 'hockey', 'innebandy')
+
+sport_artiklar.most_common_words('fotboll')
+sport_artiklar.word_over_time('fotboll', 'hockey', 'innebandy')
