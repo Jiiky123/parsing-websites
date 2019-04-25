@@ -185,6 +185,10 @@ class GetArticles:
 
 # -----------------------------------------------------------------------------
 
-# sport_artiklar = GetArticles('sport')
-# sport_artiklar.most_common_words('fotboll')
-# sport_artiklar.word_over_time('fotboll', 'hockey', 'innebandy')
+
+if __name__ == '__main__':
+    sport_artiklar = GetArticles('sport')
+    sport_artiklar.most_common_words('fotboll')
+    sport_artiklar.word_over_time('fotboll', 'hockey', 'innebandy')
+else:
+    print('run from another script')
