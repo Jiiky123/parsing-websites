@@ -38,7 +38,7 @@ def get_articles(searchword, limit, offset=0, language='sv'):  # swe=sv fin=fi
             lead = item['lead'].replace('\u2009', '')
             author = ''.join(item['author'])
         except KeyError:
-            print('data missing - continue')
+            print('some data missing - continue')
 
         # append to lists
         dates.append(date)
@@ -68,6 +68,7 @@ def get_articles(searchword, limit, offset=0, language='sv'):  # swe=sv fin=fi
     # location and shape
     print('Saved as yle_articles_{}.xlsx'.format(searchword))
     print('Shape of dataframe: ', articles.shape)
+    print('Shape of dataframe: ', articles.info())
 
     return articles
 
@@ -92,7 +93,7 @@ def most_common_words(category, word=None):
     print('# of articles: ', len(words_df.headline))
 
     if word is not None:
-        print('Your word \'{}\' got mentioned'.format(word), results.get(word), 'times')
+        print('Your exact word \'{}\' got mentioned'.format(word), results.get(word), 'times')
 
     for item in results.most_common():
         print(item)
@@ -156,5 +157,6 @@ def word_pop_over_time(category, *words, c='b'):
 # ----------------------------------------------------------------------------
 
 
-# most_common_words('e-urheilu')
-word_pop_over_time('pietarsaari', 'riko', 'jaro')
+get_articles('politik', 20000)
+word_pop_over_time('politik', 'jämställd', 'trump')
+most_common_words('feminism', 'arbete')
