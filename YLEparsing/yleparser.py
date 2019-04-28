@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 # offset if you want to start from a given nr of articles
 # languages are swedish=sv, finnish=fi, english=en
 
-# most_common_words(query, word=None)
+# most_common_words(query, word=None, wordslen=100)
 # wordslen=100, gives the length of list with popular words
 # word=None can be changed if you want to know count of specific word
 
