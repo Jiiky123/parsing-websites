@@ -178,13 +178,13 @@ class TweetWordAnalysis():
 
 if __name__ == '__main__':
 
-    market_query = ['spx' or 'sp500' or 'dax' or
-                    'dax30' or 'nasdaq' or 'stockmarket' or
-                    'market' or 'nq' or 'djia' or 'dow' or
-                    'dowjones' or 'nyse']
-    tweets = GetTweets()
-    df = tweets.get_tweets(
-        market_query)
+    # market_query = ['spx' or 'sp500' or 'dax' or
+    #                 'dax30' or 'nasdaq' or 'stockmarket' or
+    #                 'market' or 'nq' or 'djia' or 'dow' or
+    #                 'dowjones' or 'nyse']
+    # tweets = GetTweets()
+    # df = tweets.get_tweets(
+    #     market_query)
 
     neg_words = ['bear', 'sell', 'resistance', 'short']
     pos_words = ['bull', 'buy', 'support', 'long']
