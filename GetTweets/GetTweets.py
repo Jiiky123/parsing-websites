@@ -92,7 +92,7 @@ class GetTweets():
 
     def __init__(self):
         self.auth = TwitterAuthenticator().authenticate_twitter_app()
-        self.api = API(self.auth)
+        self.api = API(self.auth, wait_on_rate_limit=True)
 
     def get_tweets(self, query):
         df = pd.DataFrame(columns=['date', 'message', 'retweets'])
@@ -104,7 +104,7 @@ class GetTweets():
         try:  # try except block for the case of rate_limit
             tweepy_tweet = Cursor(self.api.search, q=query, lang='en',
                                   result_type='recent', include_rts=False,
-                                  since='2019-1-1', count=200).items(10000)
+                                  since='2019-5-20', count=200).items(15000)
             for tweet in tweepy_tweet:  # exclude tweets with RT @
                 if 'RT @' not in str(tweet.text.encode('utf-8', 'ignore')):
                     date.append(tweet.created_at)
@@ -146,8 +146,8 @@ class TweetWordAnalysis():
                 count = len(re.findall(r'\b{}\w*'.format(word), words))
                 if retweets == 0:
                     neg_word_list.append(count)
-                else:  # give retweets weight by squaring
-                    neg_word_list.append(count*retweets**2)
+                else:
+                    neg_word_list.append(count*retweets)
                 neg_word_dates.append(date)
 
         neg_word_df = pd.DataFrame(
@@ -165,8 +165,8 @@ class TweetWordAnalysis():
                 count = len(re.findall(r'\b{}\w*'.format(word), words))
                 if retweets == 0:
                     pos_word_list.append(count)
-                else:  # give retweets weight by squaring
-                    pos_word_list.append(count*retweets**2)
+                else:
+                    pos_word_list.append(count*retweets)
                 pos_word_dates.append(date)
 
         pos_word_df = pd.DataFrame(
@@ -179,14 +179,28 @@ class TweetWordAnalysis():
 
 if __name__ == '__main__':
 
-    market_query = (
-        'spx OR sp500 OR dax OR dax30 OR nasdaq OR stockmarket OR market OR\
-         nq OR djia OR dow OR dowjones OR nyse')
+    market_query = ('spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse')
     tweets = GetTweets()
     df = tweets.get_tweets(
         market_query)
+    df.to_csv('market.csv')
 
+    df = pd.read_csv('market.csv', index_col=0)
+    print(df.retweets.max())
     neg_words = ['bear', 'sell', 'resistance', 'short']
     pos_words = ['bull', 'buy', 'support', 'long']
     word_analysis = TweetWordAnalysis(df)
     neg, pos = word_analysis.neg_pos_words_count(neg_words, pos_words)
+
+    # import datetime as dt
+    # import matplotlib.pyplot as plt
+    # neg.sort_values('date', inplace=True)
+    # pos.sort_values('date', inplace=True)
+    # neg = neg.reset_index(drop=True)
+    # pos = pos.reset_index(drop=True)
+    #
+    # diff = pos.pos_words.cumsum() - neg.neg_words.cumsum()
+    #
+    # plt.plot(neg.index, diff,
+    #          c='b')
+    # plt.show()
