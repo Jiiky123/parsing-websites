@@ -195,7 +195,8 @@ if __name__ == '__main__':
 
     market_query = ('spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse')
 
-    df = GetTweets.get_tweets(market_query)
+    tweets = GetTweets()
+    df = tweets.get_tweets(market_query)
     df.to_csv('market.csv')
 
     df = pd.read_csv('market.csv', index_col=0)
