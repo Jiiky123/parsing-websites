@@ -88,13 +88,13 @@ class TwitterListener(StreamListener):  # stream tweets
         print(status)
 
 
-class GetTweets(TwitterStreamer):
+class GetTweets():
 
     def __init__(self):
         self.auth = TwitterAuthenticator().authenticate_twitter_app()
         self.api = API(self.auth)
 
-    def get_tweets(self, query=[]):
+    def get_tweets(self, query):
         df = pd.DataFrame(columns=['date', 'message', 'retweets'])
 
         date = []
@@ -104,7 +104,7 @@ class GetTweets(TwitterStreamer):
         try:  # try except block for the case of rate_limit
             tweepy_tweet = Cursor(self.api.search, q=query, lang='en',
                                   result_type='recent', include_rts=False,
-                                  since='2019-5-12', count=200).items(99999)
+                                  since='2019-1-1', count=200).items(10000)
             for tweet in tweepy_tweet:  # exclude tweets with RT @
                 if 'RT @' not in str(tweet.text.encode('utf-8', 'ignore')):
                     date.append(tweet.created_at)
@@ -121,7 +121,8 @@ class GetTweets(TwitterStreamer):
         except BaseException as e:
             print('Error on data: {}'.format(str(e)))
 
-        print('{} tweets fetched\n'.format(len(df)))
+        print('Query: ', query)
+        print('{} tweets fetched'.format(len(df)))
         return df
 
 
@@ -178,10 +179,9 @@ class TweetWordAnalysis():
 
 if __name__ == '__main__':
 
-    market_query = ['spx' or 'sp500' or 'dax' or
-                    'dax30' or 'nasdaq' or 'stockmarket' or
-                    'market' or 'nq' or 'djia' or 'dow' or
-                    'dowjones' or 'nyse']
+    market_query = (
+        'spx OR sp500 OR dax OR dax30 OR nasdaq OR stockmarket OR market OR\
+         nq OR djia OR dow OR dowjones OR nyse')
     tweets = GetTweets()
     df = tweets.get_tweets(
         market_query)
