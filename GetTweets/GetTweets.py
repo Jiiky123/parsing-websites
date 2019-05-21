@@ -10,6 +10,8 @@ import pandas as pd
 import os
 import time
 import re
+from datetime import date
+import matplotlib.pyplot as plt
 
 # make path relative to script
 abspath = os.path.abspath(__file__)
@@ -104,7 +106,7 @@ class GetTweets():
         try:  # try except block for the case of rate_limit
             tweepy_tweet = Cursor(self.api.search, q=query, lang='en',
                                   result_type='recent', include_rts=False,
-                                  since='2019-5-20', count=200).items(15000)
+                                  since=date.today(), count=200).items(15000)
             for tweet in tweepy_tweet:  # exclude tweets with RT @
                 if 'RT @' not in str(tweet.text.encode('utf-8', 'ignore')):
                     date.append(tweet.created_at)
@@ -134,7 +136,7 @@ class TweetWordAnalysis():
         # make tweet.text lowercase for regex
         self.df.message = self.df.message.astype(str).str.lower()
 
-    def neg_pos_words_count(self, neg_words, pos_words):
+    def words_count(self, neg_words, pos_words, plot=True):
         # list of positive and negative words as arguments
         # count negative words
         neg_word_list = []
@@ -174,33 +176,32 @@ class TweetWordAnalysis():
 
         print('# of bullish words: ', pos_word_df.pos_words.sum())
 
-        return neg_word_df, pos_word_df
+        # sort both df's
+        neg_word_df.sort_values('date', inplace=True)
+        pos_word_df.sort_values('date', inplace=True)
+        neg_word_df = neg_word_df.reset_index(drop=True)
+        pos_word_df = pos_word_df.reset_index(drop=True)
+
+        if plot == True:  # plot pos/neg tweet difference over time
+            diff = pos_word_df.pos_words.cumsum() - neg_word_df.neg_words.cumsum()
+
+            plt.plot(neg_word_df.index, diff,
+                     c='b', label='pos/neg tweet diff')
+            plt.legend()
+            plt.show()
 
 
 if __name__ == '__main__':
 
     market_query = ('spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse')
-    tweets = GetTweets()
-    df = tweets.get_tweets(
-        market_query)
+
+    df = GetTweets.get_tweets(market_query)
     df.to_csv('market.csv')
 
     df = pd.read_csv('market.csv', index_col=0)
     print(df.retweets.max())
     neg_words = ['bear', 'sell', 'resistance', 'short']
     pos_words = ['bull', 'buy', 'support', 'long']
-    word_analysis = TweetWordAnalysis(df)
-    neg, pos = word_analysis.neg_pos_words_count(neg_words, pos_words)
 
-    # import datetime as dt
-    # import matplotlib.pyplot as plt
-    # neg.sort_values('date', inplace=True)
-    # pos.sort_values('date', inplace=True)
-    # neg = neg.reset_index(drop=True)
-    # pos = pos.reset_index(drop=True)
-    #
-    # diff = pos.pos_words.cumsum() - neg.neg_words.cumsum()
-    #
-    # plt.plot(neg.index, diff,
-    #          c='b')
-    # plt.show()
+    analysis = TweetWordAnalysis(df)
+    analysis.words_count(neg_words, pos_words, plot=True)
