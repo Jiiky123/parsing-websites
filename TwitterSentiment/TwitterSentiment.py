@@ -11,7 +11,10 @@ import os
 import time
 import re
 from datetime import date
+from datetime import datetime
 import matplotlib.pyplot as plt
+from matplotlib.dates import date2num
+import matplotlib.animation as animation
 
 # make path relative to script
 abspath = os.path.abspath(__file__)
@@ -19,9 +22,18 @@ dname = os.path.dirname(abspath)
 os.chdir(dname)
 
 
-class TwitterClient():  # inspect specific twitter users
+class TwitterAuthenticator:
+
+    def authenticate_twitter_app():
+        auth = OAuthHandler(twitter_credentials.CONSUMER_KEY, twitter_credentials.CONSUMER_SECRET)
+        auth.set_access_token(twitter_credentials.ACCESS_TOKEN,
+                              twitter_credentials.ACCESS_TOKEN_SECRET)
+        return auth
+
+
+class UserTweetFetcher:  # inspect specific twitter users
     def __init__(self, twitter_user=None):
-        self.auth = TwitterAuthenticator().authenticate_twitter_app()
+        self.auth = TwitterAuthenticator.authenticate_twitter_app()
         self.twitter_client = API(self.auth)
         self.twitter_user = twitter_user
 
@@ -47,16 +59,7 @@ class TwitterClient():  # inspect specific twitter users
         return home_timeline_tweets
 
 
-class TwitterAuthenticator():
-
-    def authenticate_twitter_app(self):
-        auth = OAuthHandler(twitter_credentials.CONSUMER_KEY, twitter_credentials.CONSUMER_SECRET)
-        auth.set_access_token(twitter_credentials.ACCESS_TOKEN,
-                              twitter_credentials.ACCESS_TOKEN_SECRET)
-        return auth
-
-
-class TwitterStreamer():
+class TwitterStreamer:
     def __init__(self):
         self.twitter_authenticator = TwitterAuthenticator()
 
@@ -90,13 +93,11 @@ class TwitterListener(StreamListener):  # stream tweets
         print(status)
 
 
-class GetTweets():
+class TweetFetcher:
 
-    def __init__(self):
-        self.auth = TwitterAuthenticator().authenticate_twitter_app()
-        self.api = API(self.auth, wait_on_rate_limit=True)
-
-    def get_tweets(self, query):
+    def get_tweets(query, items=30000):
+        auth = TwitterAuthenticator.authenticate_twitter_app()
+        api = API(auth, wait_on_rate_limit=True)
         df = pd.DataFrame(columns=['date', 'message', 'retweets'])
 
         date = []
@@ -104,9 +105,9 @@ class GetTweets():
         retweets = []
 
         try:  # try except block for the case of rate_limit
-            tweepy_tweet = Cursor(self.api.search, q=query, lang='en',
+            tweepy_tweet = Cursor(api.search, q=query,
                                   result_type='recent', include_rts=False,
-                                  since=date.today(), count=200).items(15000)
+                                  since='2019-5-23', count=200).items(items)
             for tweet in tweepy_tweet:  # exclude tweets with RT @
                 if 'RT @' not in str(tweet.text.encode('utf-8', 'ignore')):
                     date.append(tweet.created_at)
@@ -128,23 +129,19 @@ class GetTweets():
         return df
 
 
-class TweetWordAnalysis():
-    def __init__(self, df):
-        self.df = df
-        self.results = Counter()  # stores word-count pairs
-        self.df.message.astype(str).str.lower().str.split().apply(self.results.update)
-        # make tweet.text lowercase for regex
-        self.df.message = self.df.message.astype(str).str.lower()
+class TweetAnalysis:
 
-    def words_count(self, neg_words, pos_words, plot=True):
-        # list of positive and negative words as arguments
+    def words_count(df, neg_words, pos_words, plot=True):
+        results = Counter()  # stores word-count pairs
+        df.message.astype(str).str.lower().str.split().apply(results.update)
+        # make tweet.text lowercase for regex
+        df.message = df.message.astype(str).str.lower()
         # count negative words
         neg_word_list = []
         neg_word_dates = []
 
         for word in neg_words:
-
-            for date, words, retweets in zip(self.df.index, self.df.message, self.df.retweets):
+            for date, words, retweets in zip(df.index, df.message, df.retweets):
                 count = len(re.findall(r'\b{}\w*'.format(word), words))
                 if retweets == 0:
                     neg_word_list.append(count)
@@ -162,8 +159,7 @@ class TweetWordAnalysis():
         pos_word_dates = []
 
         for word in pos_words:
-
-            for date, words, retweets in zip(self.df.index, self.df.message, self.df.retweets):
+            for date, words, retweets in zip(df.index, df.message, df.retweets):
                 count = len(re.findall(r'\b{}\w*'.format(word), words))
                 if retweets == 0:
                     pos_word_list.append(count)
@@ -181,28 +177,74 @@ class TweetWordAnalysis():
         pos_word_df.sort_values('date', inplace=True)
         neg_word_df = neg_word_df.reset_index(drop=True)
         pos_word_df = pos_word_df.reset_index(drop=True)
+        print('START: ', neg_word_df.date.head(1))
+        print('END: ', neg_word_df.date.tail(1))
 
         if plot == True:  # plot pos/neg tweet difference over time
             diff = pos_word_df.pos_words.cumsum() - neg_word_df.neg_words.cumsum()
 
-            plt.plot(neg_word_df.index, diff,
-                     c='b', label='pos/neg tweet diff')
+            f, ax = plt.subplots()
+            ax.plot(pos_word_df.index, diff,
+                    c='b', label='pos/neg tweet diff')
+
             plt.legend()
+            plt.tight_layout()
             plt.show()
+
+        return neg_word_df, pos_word_df
+
+    def animation(self, i):  # use start_animation()
+        market_query = ('spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse')
+        neg_words = ['bear', 'sell', 'resistance', 'short']
+        pos_words = ['bull', 'buy', 'support', 'long']
+        data = TweetFetcher.get_tweets(market_query, items=5)
+        neg, pos = TweetAnalysis.words_count(data, neg_words, pos_words, plot=False)
+        diff = pos.pos_words.sum() - neg.neg_words.sum()
+
+        with open('stream_data.txt', 'r+') as file:
+            file_list = file.readlines()
+            length = len(file_list)
+            new_list = [x.split(',') for x in file_list]
+            try:
+                if length > 0:
+                    if not any(item in str(neg.date) for item in [x[0] for x in new_list]):
+                        prev_value = int(file_list[-1].split(',')[2])
+                        file.write('{},{},{}\n'.format(neg.iloc[-1, 0], length+1, prev_value+diff))
+                        print('data updated')
+                    else:
+                        print('overlap in data')
+                else:
+                    file.write('{},{},{}\n'.format(neg.iloc[-1, 0], length+1, diff))
+            except BaseException as e:
+                print('Data error: ', str(e))
+
+        pullData = open("stream_data.txt", "r").read()
+        dataArray = pullData.split('\n')
+        xar = []
+        yar = []
+        for eachLine in dataArray:
+            if len(eachLine) > 1:
+                a, x, y = eachLine.split(',')
+                xar.append(int(x))
+                yar.append(int(y))
+        self.ax1.clear()
+        self.ax1.plot(xar, yar)
+        time.sleep(1)
+
+    def start_animation(self):
+        fig = plt.figure()
+        self.ax1 = fig.add_subplot(1, 1, 1)
+
+        ani = animation.FuncAnimation(fig, stream.animation, interval=1000)
+        plt.tight_layout()
+        plt.show()
+        open('stream_data.txt', 'w').close()
 
 
 if __name__ == '__main__':
 
-    market_query = ('spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse')
+    market_query = (
+        'spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR investing OR stocks')
 
-    tweets = GetTweets()
-    df = tweets.get_tweets(market_query)
-    df.to_csv('market.csv')
-
-    df = pd.read_csv('market.csv', index_col=0)
-    print(df.retweets.max())
-    neg_words = ['bear', 'sell', 'resistance', 'short']
-    pos_words = ['bull', 'buy', 'support', 'long']
-
-    analysis = TweetWordAnalysis(df)
-    analysis.words_count(neg_words, pos_words, plot=True)
+    stream = TweetAnalysis()
+    stream.start_animation()
