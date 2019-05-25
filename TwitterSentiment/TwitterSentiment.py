@@ -1,3 +1,4 @@
+import WordLists
 from collections import Counter
 from tweepy.streaming import StreamListener
 from tweepy import Cursor
@@ -15,6 +16,8 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num
 import matplotlib.animation as animation
+from yahoo_fin import stock_info as si
+plt.style.use('dark_background')
 
 # make path relative to script
 abspath = os.path.abspath(__file__)
@@ -106,12 +109,12 @@ class TweetFetcher:
 
         try:  # try except block for the case of rate_limit
             tweepy_tweet = Cursor(api.search, q=query,
-                                  result_type='recent', include_rts=False,
+                                  result_type='recent', include_rts=False, tweet_mode='extended',
                                   since='2019-5-23', count=200).items(items)
             for tweet in tweepy_tweet:  # exclude tweets with RT @
-                if 'RT @' not in str(tweet.text.encode('utf-8', 'ignore')):
+                if 'RT @' not in str(tweet.full_text.encode('utf-8', 'ignore')):
                     date.append(tweet.created_at)
-                    message.append(str(tweet.text.encode('utf-8', 'ignore')))
+                    message.append(str(tweet.full_text.encode('utf-8', 'ignore')))
                     retweets.append(tweet.retweet_count)
 
             message = [x.replace('b\'', '') for x in message]  # clean tweet
@@ -194,10 +197,11 @@ class TweetAnalysis:
         return neg_word_df, pos_word_df
 
     def animation(self, i):  # use start_animation()
-        market_query = ('spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse')
-        neg_words = ['bear', 'sell', 'resistance', 'short']
-        pos_words = ['bull', 'buy', 'support', 'long']
-        data = TweetFetcher.get_tweets(market_query, items=5)
+        tweet_query = (
+            'spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR stocks OR equities OR investing')
+        pos_words = WordLists.positive_list
+        neg_words = WordLists.negative_list
+        data = TweetFetcher.get_tweets(tweet_query, items=20)
         neg, pos = TweetAnalysis.words_count(data, neg_words, pos_words, plot=False)
         diff = pos.pos_words.sum() - neg.neg_words.sum()
 
@@ -208,13 +212,15 @@ class TweetAnalysis:
             try:
                 if length > 0:
                     if not any(item in str(neg.date) for item in [x[0] for x in new_list]):
-                        prev_value = int(file_list[-1].split(',')[2])
-                        file.write('{},{},{}\n'.format(neg.iloc[-1, 0], length+1, prev_value+diff))
+                        prev_value = int(new_list[-1][2])
+                        file.write('{},{},{},{}\n'.format(neg.iloc[-1, 0], length+1,
+                                                          prev_value+diff, TweetAnalysis.stock_price_get('BTC-USD')))
                         print('data updated')
                     else:
                         print('overlap in data')
                 else:
-                    file.write('{},{},{}\n'.format(neg.iloc[-1, 0], length+1, diff))
+                    file.write('{},{},{},{}\n'.format(neg.iloc[-1, 0], length+1,
+                                                      diff, TweetAnalysis.stock_price_get('BTC-USD')))
             except BaseException as e:
                 print('Data error: ', str(e))
 
@@ -222,18 +228,27 @@ class TweetAnalysis:
         dataArray = pullData.split('\n')
         xar = []
         yar = []
+        bar = []
         for eachLine in dataArray:
             if len(eachLine) > 1:
-                a, x, y = eachLine.split(',')
+                a, x, y, b = eachLine.split(',')
                 xar.append(int(x))
                 yar.append(int(y))
+                bar.append(float(b))
         self.ax1.clear()
-        self.ax1.plot(xar, yar)
-        time.sleep(1)
+        self.ax1.plot(xar, yar, c='b', label='tweet sentiment')
+        self.ax2.plot(xar, bar, c='g', label='stock/index price')
+        plt.title('Twitter sentiment')
+        time.sleep(5)
+
+    def stock_price_get(stock):
+        price = si.get_live_price(stock)
+        return price
 
     def start_animation(self):
-        fig = plt.figure()
+        fig = plt.figure(figsize=(12, 8))
         self.ax1 = fig.add_subplot(1, 1, 1)
+        self.ax2 = self.ax1.twinx()
 
         ani = animation.FuncAnimation(fig, stream.animation, interval=1000)
         plt.tight_layout()
@@ -243,8 +258,14 @@ class TweetAnalysis:
 
 if __name__ == '__main__':
 
-    market_query = (
-        'spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR investing OR stocks')
+    # market_query = (
+    #     'spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR stocks OR equities OR investing')
+    #
+    # df = TweetFetcher.get_tweets(market_query, items=50000)
+    # df.to_csv('marketquery.csv')
+
+    # df = pd.read_csv('marketquery.csv', index_col=0)
+    # TweetAnalysis.words_count(df, WordLists.negative_list, WordLists.positive_list)
 
     stream = TweetAnalysis()
     stream.start_animation()
