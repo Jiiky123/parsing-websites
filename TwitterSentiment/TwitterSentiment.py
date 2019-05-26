@@ -235,10 +235,9 @@ class TweetAnalysis:
                 xar.append(int(x))
                 yar.append(int(y))
                 bar.append(float(b))
-        self.ax1.clear()
-        self.ax1.plot(xar, yar, c='b', label='tweet sentiment')
-        self.ax2.plot(xar, bar, c='g', label='stock/index price')
-        plt.title('Twitter sentiment')
+        # self.ax1.clear()
+        self.ax1.plot(xar, yar, c='skyblue', label='tweet sentiment')
+        self.ax2.plot(xar, bar, c='lightgreen', label='stock/index price')
         time.sleep(5)
 
     def stock_price_get(stock):
@@ -249,11 +248,17 @@ class TweetAnalysis:
         fig = plt.figure(figsize=(12, 8))
         self.ax1 = fig.add_subplot(1, 1, 1)
         self.ax2 = self.ax1.twinx()
+        plt.title('Twitter sentiment')
+        self.ax1.set_xlabel('update nr')
+        self.ax1.set_ylabel('tweet sentiment', color='skyblue', fontsize=11)
+        self.ax2.set_ylabel('stock/index price', color='lightgreen', fontsize=11)
 
         ani = animation.FuncAnimation(fig, stream.animation, interval=1000)
-        plt.tight_layout()
+
         plt.show()
         open('stream_data.txt', 'w').close()
+
+        # plt.tight_layout()
 
 
 if __name__ == '__main__':
