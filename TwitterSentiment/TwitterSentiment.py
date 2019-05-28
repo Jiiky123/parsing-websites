@@ -125,9 +125,9 @@ class TweetFetcher:
             df.drop_duplicates(subset='message', inplace=True)
 
         except BaseException as e:
-            print('Error on data: {}'.format(str(e)))
+            print('error on data: {}'.format(str(e)))
 
-        print('Query: ', query)
+        print('query: ', query)
         print('{} tweets fetched'.format(len(df)))
         return df
 
@@ -136,24 +136,44 @@ class TweetAnalysis:
 
     def words_count(df, neg_words, pos_words, plot=True):
         results = Counter()  # stores word-count pairs
+        df.message = df.message.str.replace('\.', '')
+        df.message = df.message.str.replace('\_', '')
+        df.message = df.message.str.replace('\#', '')
+        df.message = df.message.str.replace('\&', '')
+        df.message = df.message.str.replace('\$', '')
+        df.message = df.message.str.replace('\(', '')
+        df.message = df.message.str.replace('\)', '')
+        df.message = df.message.str.replace('\@', '')
+        df.message = df.message.str.replace('\!', '')
+        df.message = df.message.str.replace('\:', '')
+        df.message = df.message.str.replace('\;', '')
+        df.message = df.message.str.replace('\\', '')
+        df.message = df.message.str.replace('\/', '')
+        df.message = df.message.str.replace('x80', '')
+        df.message = df.message.str.replace('xe2', '')
+        df.message = df.message.str.replace('x94', '')
+        df.message = df.message.str.replace('x86', '')
+        df.message = df.message.str.replace('daxx98', '')
         df.message.astype(str).str.lower().str.split().apply(results.update)
+
+        print(results)
         # make tweet.text lowercase for regex
         df.message = df.message.astype(str).str.lower()
         # count negative words
-        neg_word_list = []
+        neg_word_count = []
         neg_word_dates = []
 
         for word in neg_words:
             for date, words, retweets in zip(df.index, df.message, df.retweets):
                 count = len(re.findall(r'\b{}\w*'.format(word), words))
                 if retweets == 0:
-                    neg_word_list.append(count)
+                    neg_word_count.append(count)
                 else:
-                    neg_word_list.append(count*retweets)
+                    neg_word_count.append(count*retweets)
                 neg_word_dates.append(date)
 
         neg_word_df = pd.DataFrame(
-            {'date': neg_word_dates, 'neg_words': neg_word_list})
+            {'date': neg_word_dates, 'neg_words': neg_word_count})
 
         print('# of bearish words: ', neg_word_df.neg_words.sum())
 
