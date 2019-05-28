@@ -98,9 +98,9 @@ class TwitterListener(StreamListener):  # stream tweets
 
 class TweetFetcher:
 
-    def get_tweets(query, items=30000):
+    def get_tweets(query, items=30000, count=200):
         auth = TwitterAuthenticator.authenticate_twitter_app()
-        api = API(auth, wait_on_rate_limit=True)
+        api = API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
         df = pd.DataFrame(columns=['date', 'message', 'retweets'])
 
         date = []
@@ -110,7 +110,7 @@ class TweetFetcher:
         try:  # try except block for the case of rate_limit
             tweepy_tweet = Cursor(api.search, q=query,
                                   result_type='recent', include_rts=False, tweet_mode='extended',
-                                  since='2019-5-23', count=200).items(items)
+                                  since='2019-5-23', count=count).items(items)
             for tweet in tweepy_tweet:  # exclude tweets with RT @
                 if 'RT @' not in str(tweet.full_text.encode('utf-8', 'ignore')):
                     date.append(tweet.created_at)
@@ -197,14 +197,26 @@ class TweetAnalysis:
         return neg_word_df, pos_word_df
 
     def animation(self, i):  # use start_animation()
-        tweet_query = (
-            'spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR stocks OR equities OR investing')
+
+        self.ax1.clear()
+        self.ax2.clear()
+
+        plt.title('Twitter sentiment')
+        self.ax1.set_xlabel('update nr')
+        self.ax1.set_ylabel('tweet sentiment', fontsize=11)
+        self.ax2.set_ylabel('stock/index price', fontsize=11)
+
+        # get sentiment words
         pos_words = WordLists.positive_list
         neg_words = WordLists.negative_list
-        data = TweetFetcher.get_tweets(tweet_query, items=20)
+
+        print('fetching tweets...')
+        data = TweetFetcher.get_tweets(self.query, items=20, count=20)
+        print('analysing sentiment...')
         neg, pos = TweetAnalysis.words_count(data, neg_words, pos_words, plot=False)
         diff = pos.pos_words.sum() - neg.neg_words.sum()
 
+        # update stream data for chart
         with open('stream_data.txt', 'r+') as file:
             file_list = file.readlines()
             length = len(file_list)
@@ -214,16 +226,17 @@ class TweetAnalysis:
                     if not any(item in str(neg.date) for item in [x[0] for x in new_list]):
                         prev_value = int(new_list[-1][2])
                         file.write('{},{},{},{}\n'.format(neg.iloc[-1, 0], length+1,
-                                                          prev_value+diff, TweetAnalysis.stock_price_get('BTC-USD')))
+                                                          prev_value+diff, TweetAnalysis.stock_price_get('^GSPC')))
                         print('data updated')
                     else:
                         print('overlap in data')
                 else:
                     file.write('{},{},{},{}\n'.format(neg.iloc[-1, 0], length+1,
-                                                      diff, TweetAnalysis.stock_price_get('BTC-USD')))
+                                                      diff, TweetAnalysis.stock_price_get('^GSPC')))
             except BaseException as e:
                 print('Data error: ', str(e))
 
+        # read stream data
         pullData = open("stream_data.txt", "r").read()
         dataArray = pullData.split('\n')
         xar = []
@@ -235,42 +248,63 @@ class TweetAnalysis:
                 xar.append(int(x))
                 yar.append(int(y))
                 bar.append(float(b))
-        # self.ax1.clear()
-        self.ax1.plot(xar, yar, c='skyblue', label='tweet sentiment')
-        self.ax2.plot(xar, bar, c='lightgreen', label='stock/index price')
-        time.sleep(5)
+
+        self.ax1.plot(xar[-1000:], yar[-1000:], c='skyblue', label='tweet sentiment')
+        self.ax2.plot(xar[-1000:], bar[-1000:], c='lightgreen', label='stock/index price')
+
+        # buy & sell signals
+        if len(yar) >= 6:
+            current = yar[-1]
+            past = yar[-6]
+            sentiment = current - past
+            print('sentiment on recent tweets: ', sentiment)
+            with open('trade_data.txt', 'a') as trade:
+
+                if (len(yar) >= 6) and sentiment > 22:
+                    trade.write('{},{}\n'.format(xar[-1], sentiment))
+                    self.ax1.axvline(xar[-1], color='green', alpha=0.3)
+
+                elif (len(yar) >= 6) and sentiment < -10:
+                    trade.write('{},{}\n'.format(xar[-1], sentiment))
+                    self.ax1.axvline(xar[-1], color='red', alpha=0.3)
+
+        # keep previous buy & sell signals in chart
+        with open('trade_data.txt', 'r') as trade:
+            trade = trade.read()
+            tradeData = trade.split('\n')
+
+            for eachline in tradeData[-400:]:
+                if len(eachline) > 1:
+                    x, sent = eachline.split(',')
+                    if sent != '' and int(sent) > 22:
+                        self.ax1.axvline(int(x), color='green', alpha=0.3)
+                    elif sent != '' and int(sent) < -10:
+                        self.ax1.axvline(int(x), color='red', alpha=0.3)
+
+        self.ax1.legend(loc=2, bbox_to_anchor=(0, 0.95))
+        self.ax2.legend(loc=2)
 
     def stock_price_get(stock):
         price = si.get_live_price(stock)
         return price
 
-    def start_animation(self):
+    def start_animation(self, query, interval=5000):
         fig = plt.figure(figsize=(12, 8))
         self.ax1 = fig.add_subplot(1, 1, 1)
         self.ax2 = self.ax1.twinx()
-        plt.title('Twitter sentiment')
-        self.ax1.set_xlabel('update nr')
-        self.ax1.set_ylabel('tweet sentiment', color='skyblue', fontsize=11)
-        self.ax2.set_ylabel('stock/index price', color='lightgreen', fontsize=11)
+        self.query = query
 
-        ani = animation.FuncAnimation(fig, stream.animation, interval=1000)
+        ani = animation.FuncAnimation(fig, stream.animation, interval=interval)
 
         plt.show()
-        open('stream_data.txt', 'w').close()
-
-        # plt.tight_layout()
+        # open('stream_data.txt', 'w').close()
+        # open('trade_data.txt', 'w').close()
 
 
 if __name__ == '__main__':
 
-    # market_query = (
-    #     'spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR stocks OR equities OR investing')
-    #
-    # df = TweetFetcher.get_tweets(market_query, items=50000)
-    # df.to_csv('marketquery.csv')
-
-    # df = pd.read_csv('marketquery.csv', index_col=0)
-    # TweetAnalysis.words_count(df, WordLists.negative_list, WordLists.positive_list)
+    query = (
+        'spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR stocks OR equities OR investing')
 
     stream = TweetAnalysis()
-    stream.start_animation()
+    stream.start_animation(query)
