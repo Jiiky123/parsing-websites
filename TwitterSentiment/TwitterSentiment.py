@@ -46,7 +46,7 @@ class UserTweetFetcher:  # inspect specific twitter users
 
     def get_user_timeline_tweets(self, num_tweets):
         tweets = []
-        for tweet in Cursor(self.twitter_client.user_timeline, id=self.twitter_user).items(num_tweets):
+        for tweet in Cursor(self.twitter_client.user_timeline, id=self.twitter_user, tweet_mode='extended').items(num_tweets):
             tweets.append(tweet)
         return tweets
 
@@ -279,7 +279,7 @@ class TweetAnalysis:
         self.ax2.xaxis.set_major_formatter(xformatter)
         self.ax2.xaxis.set_minor_formatter(xformatter)
 
-        self.ax1.plot(dateX[-1000:], yar[-1000:], c='skyblue', label='tweet sentiment')
+        self.ax1.plot(dateX[-1000:], yar[-1000:], c='skyblue', label='tweet sentiment', alpha=0.5)
         self.ax2.plot(dateX[-1000:], bar[-1000:], c='lightgreen',
                       label='{} price'.format(self.pricequery))
 
@@ -312,8 +312,149 @@ class TweetAnalysis:
                     elif sent != '' and int(sent) < -10:
                         self.ax1.axvline(x, color='red', alpha=0.3)
 
+        # damp tweet alerts
+        date, position = TweetAnalysis.drdamp_trade_alert()
+
+        with open('damp_trades.txt', 'r') as damptrades:
+            damptrades = damptrades.read()
+            damptrades = damptrades.split('\n')
+
+        dates = []
+        if len(damptrades) >= 0:
+            for line in damptrades:
+                if len(line) > 1:
+                    date_bef, trade = line.split(',')
+                    dates.append(date_bef)
+            if not date in dates:
+                if position == 0:
+                    self.ax1.axvline(date, color='purple', alpha=1, linewidth=3)
+                    with open('damp_trades.txt', 'a') as damp:
+                        damp.write('{},{}\n'.format(date, position))
+
+                elif position == 1:
+                    self.ax1.axvline(date, color='y', alpha=1, linewidth=3)
+                    with open('damp_trades.txt', 'a') as damp:
+                        damp.write('{},{}\n'.format(date, position))
+
+                elif position == 2:
+                    self.ax1.axvline(date, color='white', alpha=1, linewidth=3)
+                    with open('damp_trades.txt', 'a') as damp:
+                        damp.write('{},{}\n'.format(date, position))
+
+            with open('damp_trades.txt', 'r') as damp:
+                damp = damp.read()
+                damp = damp.split('\n')
+            for trade in damp:
+                if len(trade) > 0:
+                    date, trade = trade.split(',')
+                    date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
+                    if int(trade) == 1:
+                        self.ax1.axvline(date, color='y', alpha=1, linewidth=3)
+
+            with open('damp_trades.txt', 'r') as damp:
+                damp = damp.read()
+                damp = damp.split('\n')
+            for trade in damp:
+                if len(trade) > 0:
+                    date, trade = trade.split(',')
+                    date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
+                    if int(trade) == 0:
+                        self.ax1.axvline(date, color='purple', alpha=1, linewidth=3)
+
+            with open('damp_trades.txt', 'r') as damp:
+                damp = damp.read()
+                damp = damp.split('\n')
+            for trade in damp:
+                if len(trade) > 0:
+                    date, trade = trade.split(',')
+                    date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
+                    if int(trade) == 2:
+                        self.ax1.axvline(date, color='white', alpha=1, linewidth=3)
+
+        else:
+            if position == 0:
+                self.ax1.axvline(date, color='purple', alpha=1, linewidth=3)
+                with open('damp_trades.txt', 'a') as damp:
+                    damp.write('{},{}\n'.format(date, position))
+
+            elif position == 1:
+                self.ax1.axvline(date, color='yellow', alpha=1, linewidth=3)
+                with open('damp_trades.txt', 'a') as damp:
+                    damp.write('{},{}\n'.format(date, position))
+
+            elif position == 2:
+                self.ax1.axvline(date, color='white', alpha=1, linewidth=3)
+                with open('damp_trades.txt', 'a') as damp:
+                    damp.write('{},{}\n'.format(date, position))
+
         self.ax1.legend(loc=2, bbox_to_anchor=(0, 0.95))
         self.ax2.legend(loc=2)
+
+    def drdamp_trade_alert():
+        damp_tweets = UserTweetFetcher(twitter_user='DrDampen')
+        damp_tweet = damp_tweets.get_user_timeline_tweets(1)
+
+        date_created = [tw.created_at for tw in damp_tweet][0]
+        tweet_text = [tw.full_text for tw in damp_tweet][0].lower()
+
+        if not '\@' in tweet_text:
+            if ('kort' in tweet_text or 'short' in tweet_text) and 'sp' in tweet_text:
+                print('{}: DrDamp SHORT SP500'.format(date_created))
+                print(tweet_text)
+                position = 0
+                return date_created, position
+
+            elif ('long' in tweet_text or 'lång' in tweet_text) and 'sp' in tweet_text:
+                print('{}: DrDamp LONG SP500'.format(date_created))
+                print(tweet_text)
+                position = 1
+                return date_created, position
+
+            elif ('kort' in tweet_text or 'short' in tweet_text) and 'dax' in tweet_text:
+                print('{}: DrDamp SHORT DAX'.format(date_created))
+                print(tweet_text)
+                position = 0
+                return date_created, position
+
+            elif ('long' in tweet_text or 'lång' in tweet_text) and 'dax' in tweet_text:
+                print('{}: DrDamp LONG DAX'.format(date_created))
+                print(tweet_text)
+                position = 1
+                return date_created, position
+
+            elif ('kort' in tweet_text or 'short' in tweet_text) and 'dj' in tweet_text:
+                print('{}: DrDamp SHORT DOW'.format(date_created))
+                print(tweet_text)
+                position = 0
+                return date_created, position
+
+            elif ('long' in tweet_text or 'lång' in tweet_text) and 'dj' in tweet_text:
+                print('{}: DrDamp LONG DOW'.format(date_created))
+                print(tweet_text)
+                position = 1
+                return date_created, position
+
+            elif ('kort' in tweet_text or 'short' in tweet_text) and 'omx' in tweet_text:
+                print('{}: DrDamp SHORT OMXS'.format(date_created))
+                print(tweet_text)
+                position = 0
+                return date_created, position
+
+            elif ('long' in tweet_text or 'lång' in tweet_text) and 'omx' in tweet_text:
+                print('{}: DrDamp LONG OMXS'.format(date_created))
+                print(tweet_text)
+                position = 1
+                return date_created, position
+
+            elif 'ur' in tweet_text:
+                print('{}: DrDamp exited position'.format(date_created))
+                position = 2
+                return date_created, position
+
+            else:
+                position = None
+                date_created = None
+                return date_created, position
 
     def stock_price_get(stock):
         price = si.get_live_price(stock)
@@ -354,7 +495,7 @@ class TweetAnalysis:
             with open('trade_data.txt', 'r') as file:
                 file = file.readlines()
                 for line in file:
-                    data.write(line)
+                    trade_data.write(line)
             trade_data.close()
             print('file appended')
 
@@ -377,8 +518,28 @@ class TweetAnalysis:
             stream_data.close()
             print('file appended')
 
+        if not os.path.exists('Querydata/{}/{}_damp.txt'.format(self.pricequery, date.today())):
+            damp_trades = open(
+                'Querydata/{}/{}_damp.txt'.format(self.pricequery, date.today()), 'w')
+            with open('damp_trades.txt', 'r') as file:
+                file = file.readlines()
+                for line in file:
+                    damp_trades.write(line)
+            damp_trades.close()
+            print('new file created')
+        else:
+            damp_trades = open(
+                'Querydata/{}/{}_damp.txt'.format(self.pricequery, date.today()), 'a')
+            with open('damp_trades.txt', 'r') as file:
+                file = file.readlines()
+                for line in file:
+                    damp_trades.write(line)
+            damp_trades.close()
+            print('file appended')
+
         open('stream_data.txt', 'w').close()
         open('trade_data.txt', 'w').close()
+        open('damp_trades.txt', 'w').close()
 
 
 if __name__ == '__main__':
