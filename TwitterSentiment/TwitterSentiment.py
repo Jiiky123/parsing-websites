@@ -13,8 +13,9 @@ import time
 import re
 from datetime import date
 from datetime import datetime
+import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.dates import date2num
+from matplotlib.dates import date2num, DayLocator, DateFormatter, HourLocator
 import matplotlib.animation as animation
 from yahoo_fin import stock_info as si
 plt.style.use('dark_background')
@@ -222,7 +223,6 @@ class TweetAnalysis:
         self.ax2.clear()
 
         plt.title('Twitter sentiment')
-        self.ax1.set_xlabel('update nr')
         self.ax1.set_ylabel('tweet sentiment', fontsize=11)
         self.ax2.set_ylabel('stock/index price', fontsize=11)
 
@@ -246,31 +246,42 @@ class TweetAnalysis:
                     if not any(item in str(neg.date) for item in [x[0] for x in new_list]):
                         prev_value = int(new_list[-1][2])
                         file.write('{},{},{},{}\n'.format(neg.iloc[-1, 0], length+1,
-                                                          prev_value+diff, TweetAnalysis.stock_price_get('^GSPC')))
+                                                          prev_value+diff, TweetAnalysis.stock_price_get(self.pricequery)))
                         print('data updated')
                     else:
                         print('overlap in data')
                 else:
                     file.write('{},{},{},{}\n'.format(neg.iloc[-1, 0], length+1,
-                                                      diff, TweetAnalysis.stock_price_get('^GSPC')))
+                                                      diff, TweetAnalysis.stock_price_get(self.pricequery)))
             except BaseException as e:
                 print('Data error: ', str(e))
 
         # read stream data
         pullData = open("stream_data.txt", "r").read()
         dataArray = pullData.split('\n')
+        dateX = []
         xar = []
         yar = []
         bar = []
         for eachLine in dataArray:
             if len(eachLine) > 1:
                 a, x, y, b = eachLine.split(',')
+                dateX.append(a)
                 xar.append(int(x))
                 yar.append(int(y))
                 bar.append(float(b))
 
-        self.ax1.plot(xar[-1000:], yar[-1000:], c='skyblue', label='tweet sentiment')
-        self.ax2.plot(xar[-1000:], bar[-1000:], c='lightgreen', label='stock/index price')
+        dateX = [datetime.strptime(x, '%Y-%m-%d %H:%M:%S') for x in dateX]
+        self.ax1.xaxis.set_major_locator(HourLocator())
+        xformatter = matplotlib.dates.DateFormatter('%H:%M')
+        self.ax1.xaxis.set_major_formatter(xformatter)
+        self.ax1.xaxis.set_minor_formatter(xformatter)
+        self.ax2.xaxis.set_major_formatter(xformatter)
+        self.ax2.xaxis.set_minor_formatter(xformatter)
+
+        self.ax1.plot(dateX[-1000:], yar[-1000:], c='skyblue', label='tweet sentiment')
+        self.ax2.plot(dateX[-1000:], bar[-1000:], c='lightgreen',
+                      label='{} price'.format(self.pricequery))
 
         # buy & sell signals
         if len(yar) >= 6:
@@ -281,12 +292,12 @@ class TweetAnalysis:
             with open('trade_data.txt', 'a') as trade:
 
                 if (len(yar) >= 6) and sentiment > 22:
-                    trade.write('{},{}\n'.format(xar[-1], sentiment))
-                    self.ax1.axvline(xar[-1], color='green', alpha=0.3)
+                    trade.write('{},{}\n'.format(dateX[-1], sentiment))
+                    self.ax1.axvline(dateX[-1], color='green', alpha=0.3)
 
                 elif (len(yar) >= 6) and sentiment < -10:
-                    trade.write('{},{}\n'.format(xar[-1], sentiment))
-                    self.ax1.axvline(xar[-1], color='red', alpha=0.3)
+                    trade.write('{},{}\n'.format(dateX[-1], sentiment))
+                    self.ax1.axvline(dateX[-1], color='red', alpha=0.3)
 
         # keep previous buy & sell signals in chart
         with open('trade_data.txt', 'r') as trade:
@@ -297,9 +308,9 @@ class TweetAnalysis:
                 if len(eachline) > 1:
                     x, sent = eachline.split(',')
                     if sent != '' and int(sent) > 22:
-                        self.ax1.axvline(int(x), color='green', alpha=0.3)
+                        self.ax1.axvline(x, color='green', alpha=0.3)
                     elif sent != '' and int(sent) < -10:
-                        self.ax1.axvline(int(x), color='red', alpha=0.3)
+                        self.ax1.axvline(x, color='red', alpha=0.3)
 
         self.ax1.legend(loc=2, bbox_to_anchor=(0, 0.95))
         self.ax2.legend(loc=2)
@@ -308,23 +319,71 @@ class TweetAnalysis:
         price = si.get_live_price(stock)
         return price
 
-    def start_animation(self, query, interval=5000):
+    def start_animation(self, query, pricequery, interval=5000):
         fig = plt.figure(figsize=(12, 8))
         self.ax1 = fig.add_subplot(1, 1, 1)
         self.ax2 = self.ax1.twinx()
         self.query = query
+        self.pricequery = pricequery
 
         ani = animation.FuncAnimation(fig, stream.animation, interval=interval)
 
         plt.show()
-        # open('stream_data.txt', 'w').close()
-        # open('trade_data.txt', 'w').close()
+        self.save_data()
+
+    def save_data(self):
+        dirName = 'Querydata/{}'.format(self.pricequery)
+        if not os.path.exists(dirName):
+            os.mkdir(dirName)
+            print("Directory ", dirName,  " Created ")
+        else:
+            print("Directory ", dirName,  " already exists")
+
+        if not os.path.exists('Querydata/{}/{}_trade.txt'.format(self.pricequery, date.today())):
+            trade_data = open(
+                'Querydata/{}/{}_trade.txt'.format(self.pricequery, date.today()), 'w')
+            with open('trade_data.txt', 'r') as file:
+                file = file.readlines()
+                for line in file:
+                    trade_data.write(line)
+            trade_data.close()
+            print('new file created')
+        else:
+            trade_data = open(
+                'Querydata/{}/{}_trade.txt'.format(self.pricequery, date.today()), 'a')
+            with open('trade_data.txt', 'r') as file:
+                file = file.readlines()
+                for line in file:
+                    data.write(line)
+            trade_data.close()
+            print('file appended')
+
+        if not os.path.exists('Querydata/{}/{}_stream.txt'.format(self.pricequery, date.today())):
+            stream_data = open(
+                'Querydata/{}/{}_stream.txt'.format(self.pricequery, date.today()), 'w')
+            with open('stream_data.txt', 'r') as file:
+                file = file.readlines()
+                for line in file:
+                    stream_data.write(line)
+            stream_data.close()
+            print('new file created')
+        else:
+            stream_data = open(
+                'Querydata/{}/{}_stream.txt'.format(self.pricequery, date.today()), 'a')
+            with open('stream_data.txt', 'r') as file:
+                file = file.readlines()
+                for line in file:
+                    stream_data.write(line)
+            stream_data.close()
+            print('file appended')
+
+        open('stream_data.txt', 'w').close()
+        open('trade_data.txt', 'w').close()
 
 
 if __name__ == '__main__':
 
-    query = (
-        'spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR stocks OR equities OR investing')
+    query = ('spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR stocks OR equities OR investing')
 
     stream = TweetAnalysis()
-    stream.start_animation(query)
+    stream.start_animation(query, '^GDAXI')
