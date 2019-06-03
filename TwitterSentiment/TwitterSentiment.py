@@ -12,12 +12,14 @@ import os
 import time
 import re
 from datetime import date
-from datetime import datetime
+from datetime import datetime, timedelta
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num, DayLocator, DateFormatter, HourLocator
 import matplotlib.animation as animation
 from yahoo_fin import stock_info as si
+from pytz import timezone
+import pytz
 plt.style.use('dark_background')
 
 # make path relative to script
@@ -271,7 +273,11 @@ class TweetAnalysis:
                 yar.append(int(y))
                 bar.append(float(b))
 
+        fmt = '%Y-%m-%d %H:%M:%S'
+        hels_time = timezone('Europe/Helsinki')
         dateX = [datetime.strptime(x, '%Y-%m-%d %H:%M:%S') for x in dateX]
+        dateX = [pytz.utc.normalize(pytz.utc.localize(x, is_dst=None)
+                                    ).astimezone(hels_time) + timedelta(hours=3) for x in dateX]
         self.ax1.xaxis.set_major_locator(HourLocator())
         xformatter = matplotlib.dates.DateFormatter('%H:%M')
         self.ax1.xaxis.set_major_formatter(xformatter)
@@ -279,8 +285,8 @@ class TweetAnalysis:
         self.ax2.xaxis.set_major_formatter(xformatter)
         self.ax2.xaxis.set_minor_formatter(xformatter)
 
-        self.ax1.plot(dateX[-1000:], yar[-1000:], c='skyblue', label='tweet sentiment', alpha=0.5)
-        self.ax2.plot(dateX[-1000:], bar[-1000:], c='lightgreen',
+        self.ax1.plot(dateX[-2000:], yar[-2000:], c='skyblue', label='tweet sentiment', alpha=0.5)
+        self.ax2.plot(dateX[-2000:], bar[-2000:], c='lightgreen',
                       label='{} price'.format(self.pricequery))
 
         # buy & sell signals
@@ -304,7 +310,7 @@ class TweetAnalysis:
             trade = trade.read()
             tradeData = trade.split('\n')
 
-            for eachline in tradeData[-400:]:
+            for eachline in tradeData[-500:]:
                 if len(eachline) > 1:
                     x, sent = eachline.split(',')
                     if sent != '' and int(sent) > 22:
@@ -325,7 +331,7 @@ class TweetAnalysis:
                 if len(line) > 1:
                     date_bef, trade = line.split(',')
                     dates.append(date_bef)
-            if not date in dates:
+            if not str(date) in dates:
                 if position == 0:
                     self.ax1.axvline(date, color='purple', alpha=1, linewidth=3)
                     with open('damp_trades.txt', 'a') as damp:
@@ -446,7 +452,8 @@ class TweetAnalysis:
                 position = 1
                 return date_created, position
 
-            elif 'ur' in tweet_text:
+            elif ('ur' in tweet_text or 'ut' in tweet_text) and (
+                    'omx' in tweet_text or 'dax' in tweet_text or 'sp' in tweet_text or 'dj' in tweet_text):
                 print('{}: DrDamp exited position'.format(date_created))
                 position = 2
                 return date_created, position
@@ -502,6 +509,7 @@ class TweetAnalysis:
         if not os.path.exists('Querydata/{}/{}_stream.txt'.format(self.pricequery, date.today())):
             stream_data = open(
                 'Querydata/{}/{}_stream.txt'.format(self.pricequery, date.today()), 'w')
+
             with open('stream_data.txt', 'r') as file:
                 file = file.readlines()
                 for line in file:
