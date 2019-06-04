@@ -116,7 +116,12 @@ class TweetFetcher:
                                   since='2019-5-23', count=count).items(items)
             for tweet in tweepy_tweet:  # exclude tweets with RT @
                 if 'RT @' not in str(tweet.full_text.encode('utf-8', 'ignore')):
-                    date.append(tweet.created_at)
+                    hels_time = timezone('Europe/Helsinki')
+                    created_at = tweet.created_at
+                    created_at = pytz.utc.normalize(pytz.utc.localize(
+                        created_at, is_dst=None)).astimezone(hels_time)
+                    created_at = created_at.replace(tzinfo=None)
+                    date.append(created_at)
                     message.append(str(tweet.full_text.encode('utf-8', 'ignore')))
                     retweets.append(tweet.retweet_count)
 
@@ -273,11 +278,6 @@ class TweetAnalysis:
                 yar.append(int(y))
                 bar.append(float(b))
 
-        fmt = '%Y-%m-%d %H:%M:%S'
-        hels_time = timezone('Europe/Helsinki')
-        dateX = [datetime.strptime(x, '%Y-%m-%d %H:%M:%S') for x in dateX]
-        dateX = [pytz.utc.normalize(pytz.utc.localize(x, is_dst=None)
-                                    ).astimezone(hels_time) + timedelta(hours=3) for x in dateX]
         self.ax1.xaxis.set_major_locator(HourLocator())
         xformatter = matplotlib.dates.DateFormatter('%H:%M')
         self.ax1.xaxis.set_major_formatter(xformatter)
@@ -285,8 +285,13 @@ class TweetAnalysis:
         self.ax2.xaxis.set_major_formatter(xformatter)
         self.ax2.xaxis.set_minor_formatter(xformatter)
 
-        self.ax1.plot(dateX[-2000:], yar[-2000:], c='skyblue', label='tweet sentiment', alpha=0.5)
-        self.ax2.plot(dateX[-2000:], bar[-2000:], c='lightgreen',
+        boundary = -2000
+        dateX = [datetime.strptime(x, '%Y-%m-%d %H:%M:%S') for x in dateX]
+        dateX_plot = dateX[boundary:]
+        yar_plot = yar[boundary:]
+        bar_plot = bar[boundary:]
+        self.ax1.plot(dateX_plot, yar_plot, c='skyblue', label='tweet sentiment', alpha=0.5)
+        self.ax2.plot(dateX_plot, bar_plot, c='lightgreen',
                       label='{} price'.format(self.pricequery))
 
         # buy & sell signals
@@ -298,12 +303,12 @@ class TweetAnalysis:
             with open('trade_data.txt', 'a') as trade:
 
                 if (len(yar) >= 6) and sentiment > 22:
-                    trade.write('{},{}\n'.format(dateX[-1], sentiment))
-                    self.ax1.axvline(dateX[-1], color='green', alpha=0.3)
+                    trade.write('{},{}\n'.format(dateX_plot[-1], sentiment))
+                    self.ax1.axvline(dateX_plot[-1], color='green', alpha=0.1)
 
                 elif (len(yar) >= 6) and sentiment < -10:
-                    trade.write('{},{}\n'.format(dateX[-1], sentiment))
-                    self.ax1.axvline(dateX[-1], color='red', alpha=0.3)
+                    trade.write('{},{}\n'.format(dateX_plot[-1], sentiment))
+                    self.ax1.axvline(dateX_plot[-1], color='red', alpha=0.1)
 
         # keep previous buy & sell signals in chart
         with open('trade_data.txt', 'r') as trade:
@@ -313,10 +318,12 @@ class TweetAnalysis:
             for eachline in tradeData[-500:]:
                 if len(eachline) > 1:
                     x, sent = eachline.split(',')
-                    if sent != '' and int(sent) > 22:
-                        self.ax1.axvline(x, color='green', alpha=0.3)
-                    elif sent != '' and int(sent) < -10:
-                        self.ax1.axvline(x, color='red', alpha=0.3)
+                    x = datetime.strptime(x, '%Y-%m-%d %H:%M:%S')
+
+                    if int(sent) > 22:
+                        self.ax1.axvline(x, color='green', alpha=0.1)
+                    elif int(sent) < -10:
+                        self.ax1.axvline(x, color='red', alpha=0.1)
 
         # damp tweet alerts
         date, position = TweetAnalysis.drdamp_trade_alert()
@@ -333,63 +340,66 @@ class TweetAnalysis:
                     dates.append(date_bef)
             if not str(date) in dates:
                 if position == 0:
-                    self.ax1.axvline(date, color='purple', alpha=1, linewidth=3)
+                    self.ax1.axvline(date, color='purple', alpha=1, linewidth=2)
                     with open('damp_trades.txt', 'a') as damp:
                         damp.write('{},{}\n'.format(date, position))
 
                 elif position == 1:
-                    self.ax1.axvline(date, color='y', alpha=1, linewidth=3)
+                    self.ax1.axvline(date, color='y', alpha=1, linewidth=2)
                     with open('damp_trades.txt', 'a') as damp:
                         damp.write('{},{}\n'.format(date, position))
 
                 elif position == 2:
-                    self.ax1.axvline(date, color='white', alpha=1, linewidth=3)
+                    self.ax1.axvline(date, color='white', alpha=1, linewidth=2)
                     with open('damp_trades.txt', 'a') as damp:
                         damp.write('{},{}\n'.format(date, position))
 
             with open('damp_trades.txt', 'r') as damp:
                 damp = damp.read()
                 damp = damp.split('\n')
+
             for trade in damp:
                 if len(trade) > 0:
                     date, trade = trade.split(',')
                     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
                     if int(trade) == 1:
-                        self.ax1.axvline(date, color='y', alpha=1, linewidth=3)
+                        self.ax1.axvline(date, color='y', alpha=1, linewidth=2)
 
             with open('damp_trades.txt', 'r') as damp:
                 damp = damp.read()
                 damp = damp.split('\n')
+
             for trade in damp:
                 if len(trade) > 0:
                     date, trade = trade.split(',')
                     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
                     if int(trade) == 0:
-                        self.ax1.axvline(date, color='purple', alpha=1, linewidth=3)
+                        self.ax1.axvline(date, color='purple', alpha=1, linewidth=2)
 
             with open('damp_trades.txt', 'r') as damp:
                 damp = damp.read()
                 damp = damp.split('\n')
+
             for trade in damp:
                 if len(trade) > 0:
                     date, trade = trade.split(',')
                     date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
                     if int(trade) == 2:
-                        self.ax1.axvline(date, color='white', alpha=1, linewidth=3)
+                        self.ax1.axvline(date, color='white', alpha=1, linewidth=2)
 
         else:
             if position == 0:
-                self.ax1.axvline(date, color='purple', alpha=1, linewidth=3)
+                self.ax1.axvline(date, color='purple', alpha=1, linewidth=2)
                 with open('damp_trades.txt', 'a') as damp:
                     damp.write('{},{}\n'.format(date, position))
 
             elif position == 1:
-                self.ax1.axvline(date, color='yellow', alpha=1, linewidth=3)
+                self.ax1.axvline(date, color='yellow', alpha=1, linewidth=2)
                 with open('damp_trades.txt', 'a') as damp:
                     damp.write('{},{}\n'.format(date, position))
 
             elif position == 2:
-                self.ax1.axvline(date, color='white', alpha=1, linewidth=3)
+                self.ax1.axvline(date, color='white', alpha=1, linewidth=2)
                 with open('damp_trades.txt', 'a') as damp:
                     damp.write('{},{}\n'.format(date, position))
 
@@ -401,6 +411,12 @@ class TweetAnalysis:
         damp_tweet = damp_tweets.get_user_timeline_tweets(1)
 
         date_created = [tw.created_at for tw in damp_tweet][0]
+
+        hels_time = timezone('Europe/Helsinki')
+        date_created = pytz.utc.normalize(pytz.utc.localize(
+            date_created, is_dst=None)).astimezone(hels_time)
+        date_created = date_created.replace(tzinfo=None)
+
         tweet_text = [tw.full_text for tw in damp_tweet][0].lower()
 
         if not '\@' in tweet_text:
@@ -481,28 +497,35 @@ class TweetAnalysis:
 
     def save_data(self):
         dirName = 'Querydata/{}'.format(self.pricequery)
+
         if not os.path.exists(dirName):
             os.mkdir(dirName)
             print("Directory ", dirName,  " Created ")
+
         else:
             print("Directory ", dirName,  " already exists")
 
         if not os.path.exists('Querydata/{}/{}_trade.txt'.format(self.pricequery, date.today())):
             trade_data = open(
                 'Querydata/{}/{}_trade.txt'.format(self.pricequery, date.today()), 'w')
+
             with open('trade_data.txt', 'r') as file:
                 file = file.readlines()
                 for line in file:
                     trade_data.write(line)
+
             trade_data.close()
             print('new file created')
+
         else:
             trade_data = open(
                 'Querydata/{}/{}_trade.txt'.format(self.pricequery, date.today()), 'a')
+
             with open('trade_data.txt', 'r') as file:
                 file = file.readlines()
                 for line in file:
                     trade_data.write(line)
+
             trade_data.close()
             print('file appended')
 
@@ -514,34 +537,43 @@ class TweetAnalysis:
                 file = file.readlines()
                 for line in file:
                     stream_data.write(line)
+
             stream_data.close()
             print('new file created')
+
         else:
             stream_data = open(
                 'Querydata/{}/{}_stream.txt'.format(self.pricequery, date.today()), 'a')
+
             with open('stream_data.txt', 'r') as file:
                 file = file.readlines()
                 for line in file:
                     stream_data.write(line)
+
             stream_data.close()
             print('file appended')
 
         if not os.path.exists('Querydata/{}/{}_damp.txt'.format(self.pricequery, date.today())):
             damp_trades = open(
                 'Querydata/{}/{}_damp.txt'.format(self.pricequery, date.today()), 'w')
+
             with open('damp_trades.txt', 'r') as file:
                 file = file.readlines()
                 for line in file:
                     damp_trades.write(line)
+
             damp_trades.close()
             print('new file created')
+
         else:
             damp_trades = open(
                 'Querydata/{}/{}_damp.txt'.format(self.pricequery, date.today()), 'a')
+
             with open('damp_trades.txt', 'r') as file:
                 file = file.readlines()
                 for line in file:
                     damp_trades.write(line)
+
             damp_trades.close()
             print('file appended')
 
@@ -555,4 +587,4 @@ if __name__ == '__main__':
     query = ('spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR stocks OR equities OR investing')
 
     stream = TweetAnalysis()
-    stream.start_animation(query, '^GDAXI')
+    stream.start_animation(query, '^GSPC')
