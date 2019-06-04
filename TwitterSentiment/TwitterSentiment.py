@@ -22,14 +22,14 @@ from pytz import timezone
 import pytz
 plt.style.use('dark_background')
 
-# make path relative to script
+# path relative to script
 abspath = os.path.abspath(__file__)
 dname = os.path.dirname(abspath)
 os.chdir(dname)
 
 
 class TwitterAuthenticator:
-
+    # API authentication
     def authenticate_twitter_app():
         auth = OAuthHandler(twitter_credentials.CONSUMER_KEY, twitter_credentials.CONSUMER_SECRET)
         auth.set_access_token(twitter_credentials.ACCESS_TOKEN,
@@ -65,42 +65,7 @@ class UserTweetFetcher:  # inspect specific twitter users
         return home_timeline_tweets
 
 
-class TwitterStreamer:
-    def __init__(self):
-        self.twitter_authenticator = TwitterAuthenticator()
-
-    def stream_tweets(self, fetched_tweets_filename, hash_tag_list):
-        # This handles API stuff
-        listener = TwitterListener(fetched_tweets_filename)
-        auth = self.twitter_authenticator.authenticate_twitter_app()
-        stream = Stream(auth, listener)
-
-        stream.filter(track=hash_tag_list)
-
-
-class TwitterListener(StreamListener):  # stream tweets
-
-    def __init__(self, fetched_tweets_filename):
-        self.fetched_tweets_filename = fetched_tweets_filename
-
-    def on_data(self, data):
-        try:
-            print(data)
-            with open(self.fetched_tweets_filename, 'a') as tf:
-                tf.write(data)
-            return True
-        except BaseException as e:
-            print('Error on data: {}'.format(str(e)))
-
-    def on_error(self, status):
-        if status == 420:
-            # Return False on on_data method in case rate limit occur
-            return False
-        print(status)
-
-
 class TweetFetcher:
-
     def get_tweets(query, items=30000, count=200):
         auth = TwitterAuthenticator.authenticate_twitter_app()
         api = API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
@@ -116,16 +81,19 @@ class TweetFetcher:
                                   since='2019-5-23', count=count).items(items)
             for tweet in tweepy_tweet:  # exclude tweets with RT @
                 if 'RT @' not in str(tweet.full_text.encode('utf-8', 'ignore')):
+                    # timezone conversion, utc -> helsinki time
                     hels_time = timezone('Europe/Helsinki')
                     created_at = tweet.created_at
                     created_at = pytz.utc.normalize(pytz.utc.localize(
                         created_at, is_dst=None)).astimezone(hels_time)
+                    # get rid of info at end of datetime str
                     created_at = created_at.replace(tzinfo=None)
                     date.append(created_at)
                     message.append(str(tweet.full_text.encode('utf-8', 'ignore')))
                     retweets.append(tweet.retweet_count)
 
-            message = [x.replace('b\'', '') for x in message]  # clean tweet
+            # replace encoding symbols from tweet
+            message = [x.replace('b\'', '') for x in message]
             temp_df = pd.DataFrame({'date': date, 'message': message,
                                     'retweets': retweets})
             df = df.append(temp_df)
@@ -144,6 +112,7 @@ class TweetAnalysis:
 
     def words_count(df, neg_words, pos_words, plot=True):
         results = Counter()  # stores word-count pairs
+        # replace symbols to make words easier to count
         df.message = df.message.str.replace('\.', '')
         df.message = df.message.str.replace('\_', '')
         df.message = df.message.str.replace('\#', '')
@@ -195,6 +164,7 @@ class TweetAnalysis:
                 if retweets == 0:
                     pos_word_list.append(count)
                 else:
+                    # retweeted tweets more weight in calculation
                     pos_word_list.append(count*retweets)
                 pos_word_dates.append(date)
 
@@ -248,6 +218,7 @@ class TweetAnalysis:
             file_list = file.readlines()
             length = len(file_list)
             new_list = [x.split(',') for x in file_list]
+            # did this one with try/except block, necessary?
             try:
                 if length > 0:
                     if not any(item in str(neg.date) for item in [x[0] for x in new_list]):
@@ -278,6 +249,7 @@ class TweetAnalysis:
                 yar.append(int(y))
                 bar.append(float(b))
 
+        # block for only showing hours and minutes in chart
         self.ax1.xaxis.set_major_locator(HourLocator())
         xformatter = matplotlib.dates.DateFormatter('%H:%M')
         self.ax1.xaxis.set_major_formatter(xformatter)
@@ -285,6 +257,7 @@ class TweetAnalysis:
         self.ax2.xaxis.set_major_formatter(xformatter)
         self.ax2.xaxis.set_minor_formatter(xformatter)
 
+        # not all data is wanted in same chart, limit x-axis
         boundary = -2000
         dateX = [datetime.strptime(x, '%Y-%m-%d %H:%M:%S') for x in dateX]
         dateX_plot = dateX[boundary:]
@@ -296,6 +269,7 @@ class TweetAnalysis:
 
         # buy & sell signals
         if len(yar) >= 6:
+            # some arbitrary way of counting sentiment change
             current = yar[-1]
             past = yar[-6]
             sentiment = current - past
@@ -325,7 +299,7 @@ class TweetAnalysis:
                     elif int(sent) < -10:
                         self.ax1.axvline(x, color='red', alpha=0.1)
 
-        # damp tweet alerts
+        # twitter user damp tweet alerts
         date, position = TweetAnalysis.drdamp_trade_alert()
 
         with open('damp_trades.txt', 'r') as damptrades:
@@ -406,12 +380,13 @@ class TweetAnalysis:
         self.ax1.legend(loc=2, bbox_to_anchor=(0, 0.95))
         self.ax2.legend(loc=2)
 
-    def drdamp_trade_alert():
+    def drdamp_trade_alert():  # parsing twitter user DrDamp tweets for signals
         damp_tweets = UserTweetFetcher(twitter_user='DrDampen')
         damp_tweet = damp_tweets.get_user_timeline_tweets(1)
 
         date_created = [tw.created_at for tw in damp_tweet][0]
 
+        # fix timezone like before when fetching
         hels_time = timezone('Europe/Helsinki')
         date_created = pytz.utc.normalize(pytz.utc.localize(
             date_created, is_dst=None)).astimezone(hels_time)
@@ -420,10 +395,11 @@ class TweetAnalysis:
         tweet_text = [tw.full_text for tw in damp_tweet][0].lower()
 
         if not '\@' in tweet_text:
+            # really the best way to parse tweets for signals? works though
             if ('kort' in tweet_text or 'short' in tweet_text) and 'sp' in tweet_text:
                 print('{}: DrDamp SHORT SP500'.format(date_created))
                 print(tweet_text)
-                position = 0
+                position = 0  # 0 = short, 1 = long, 2 = exit
                 return date_created, position
 
             elif ('long' in tweet_text or 'lång' in tweet_text) and 'sp' in tweet_text:
@@ -495,7 +471,7 @@ class TweetAnalysis:
         plt.show()
         self.save_data()
 
-    def save_data(self):
+    def save_data(self):  # on chart close - save fetched and processed data - reset
         dirName = 'Querydata/{}'.format(self.pricequery)
 
         if not os.path.exists(dirName):
@@ -577,6 +553,7 @@ class TweetAnalysis:
             damp_trades.close()
             print('file appended')
 
+        # this erases txt content for next live chart
         open('stream_data.txt', 'w').close()
         open('trade_data.txt', 'w').close()
         open('damp_trades.txt', 'w').close()
