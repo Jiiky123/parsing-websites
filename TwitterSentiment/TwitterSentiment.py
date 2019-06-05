@@ -202,6 +202,8 @@ class TweetAnalysis:
         plt.title('Twitter sentiment')
         # self.ax1.set_ylabel('tweet sentiment', fontsize=11)
         self.ax1.set_ylabel('stock/index price', fontsize=11)
+        self.ax1.yaxis.tick_right()
+        self.ax1.yaxis.set_label_position("right")
 
         # get sentiment words
         pos_words = WordLists.positive_list
@@ -396,8 +398,9 @@ class TweetAnalysis:
                 with open('damp_trades.txt', 'a') as damp:
                     damp.write('{},{}\n'.format(date, position))
 
-        self.ax1.legend(loc=2)  # bbox_to_anchor=(0, 0.95))
+          # bbox_to_anchor=(0, 0.95))
         # self.ax2.legend(loc=2)
+        self.ax1.legend(loc=2)
 
     def drdamp_trade_alert():  # parsing twitter user DrDamp tweets for signals
         damp_tweets = UserTweetFetcher(twitter_user='DrDampen')
@@ -612,4 +615,4 @@ if __name__ == '__main__':
     query = ('spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR stocks OR equities OR investing')
 
     stream = TweetAnalysis()
-    stream.start_animation(query, '^GDAXI', interval=5000)
+    stream.start_animation(query, '^GSPC', interval=5000)
