@@ -197,11 +197,11 @@ class TweetAnalysis:
     def animation(self, i):  # use start_animation()
 
         self.ax1.clear()
-        self.ax2.clear()
+        # self.ax2.clear()
 
         plt.title('Twitter sentiment')
-        self.ax1.set_ylabel('tweet sentiment', fontsize=11)
-        self.ax2.set_ylabel('stock/index price', fontsize=11)
+        # self.ax1.set_ylabel('tweet sentiment', fontsize=11)
+        self.ax1.set_ylabel('stock/index price', fontsize=11)
 
         # get sentiment words
         pos_words = WordLists.positive_list
@@ -212,6 +212,28 @@ class TweetAnalysis:
         print('analysing sentiment...')
         neg, pos = TweetAnalysis.words_count(data, neg_words, pos_words, plot=False)
         diff = pos.pos_words.sum() - neg.neg_words.sum()
+
+        # plot price on every request, sentiment only when no overlap
+        boundary = -2000
+        with open('index_price.txt', 'a') as index_price:
+            index_price.write('{},{}\n'.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                               TweetAnalysis.stock_price_get(self.pricequery)))
+
+        with open('index_price.txt', 'r') as index:
+            index = index.read()
+            index = index.split('\n')
+
+            index_dates = []
+            index_prices = []
+
+            for x in index:
+                if len(x) > 1:
+                    index_date, index_price = x.split(',')
+                    index_dates.append(index_date)
+                    index_prices.append(float(index_price))
+            index_dates = [datetime.strptime(x, '%Y-%m-%d %H:%M:%S') for x in index_dates]
+            self.ax1.plot(index_dates[boundary:], index_prices[boundary:], c='lightgreen',
+                          label='{} price'.format(self.pricequery))
 
         # update stream data for chart
         with open('stream_data.txt', 'r+') as file:
@@ -238,14 +260,12 @@ class TweetAnalysis:
         pullData = open("stream_data.txt", "r").read()
         dataArray = pullData.split('\n')
         dateX = []
-        xar = []
         yar = []
         bar = []
         for eachLine in dataArray:
             if len(eachLine) > 1:
                 a, x, y, b = eachLine.split(',')
                 dateX.append(a)
-                xar.append(int(x))
                 yar.append(int(y))
                 bar.append(float(b))
 
@@ -254,18 +274,17 @@ class TweetAnalysis:
         xformatter = matplotlib.dates.DateFormatter('%H:%M')
         self.ax1.xaxis.set_major_formatter(xformatter)
         self.ax1.xaxis.set_minor_formatter(xformatter)
-        self.ax2.xaxis.set_major_formatter(xformatter)
-        self.ax2.xaxis.set_minor_formatter(xformatter)
+        # self.ax2.xaxis.set_major_formatter(xformatter)
+        # self.ax2.xaxis.set_minor_formatter(xformatter)
 
         # not all data is wanted in same chart, limit x-axis
-        boundary = -2000
         dateX = [datetime.strptime(x, '%Y-%m-%d %H:%M:%S') for x in dateX]
         dateX_plot = dateX[boundary:]
-        yar_plot = yar[boundary:]
-        bar_plot = bar[boundary:]
-        self.ax1.plot(dateX_plot, yar_plot, c='skyblue', label='tweet sentiment', alpha=0.5)
-        self.ax2.plot(dateX_plot, bar_plot, c='lightgreen',
-                      label='{} price'.format(self.pricequery))
+        yar_plot = yar[boundary:]  # twitter sentiment plot
+        bar_plot = bar[boundary:]  # price plot
+        # self.ax1.plot(dateX_plot, yar_plot, c='skyblue', label='tweet sentiment', alpha=0.5)
+        # self.ax2.plot(dateX_plot, bar_plot, c='lightgreen',
+        #               label = '{} price'.format(self.pricequery))
 
         # buy & sell signals
         if len(yar) >= 6:
@@ -276,11 +295,11 @@ class TweetAnalysis:
             print('sentiment on recent tweets: ', sentiment)
             with open('trade_data.txt', 'a') as trade:
 
-                if (len(yar) >= 6) and sentiment > 22:
+                if (len(yar) >= 6) and sentiment > self.pos_sig:
                     trade.write('{},{}\n'.format(dateX_plot[-1], sentiment))
                     self.ax1.axvline(dateX_plot[-1], color='green', alpha=0.1)
 
-                elif (len(yar) >= 6) and sentiment < -10:
+                elif (len(yar) >= 6) and sentiment < self.neg_sig:
                     trade.write('{},{}\n'.format(dateX_plot[-1], sentiment))
                     self.ax1.axvline(dateX_plot[-1], color='red', alpha=0.1)
 
@@ -312,7 +331,7 @@ class TweetAnalysis:
                 if len(line) > 1:
                     date_bef, trade = line.split(',')
                     dates.append(date_bef)
-            if not str(date) in dates:
+            if not str(date) in str(dates):
                 if position == 0:
                     self.ax1.axvline(date, color='purple', alpha=1, linewidth=2)
                     with open('damp_trades.txt', 'a') as damp:
@@ -377,8 +396,8 @@ class TweetAnalysis:
                 with open('damp_trades.txt', 'a') as damp:
                     damp.write('{},{}\n'.format(date, position))
 
-        self.ax1.legend(loc=2, bbox_to_anchor=(0, 0.95))
-        self.ax2.legend(loc=2)
+        self.ax1.legend(loc=2)  # bbox_to_anchor=(0, 0.95))
+        # self.ax2.legend(loc=2)
 
     def drdamp_trade_alert():  # parsing twitter user DrDamp tweets for signals
         damp_tweets = UserTweetFetcher(twitter_user='DrDampen')
@@ -459,10 +478,14 @@ class TweetAnalysis:
         price = si.get_live_price(stock)
         return price
 
-    def start_animation(self, query, pricequery, interval=5000):
+    def start_animation(self, query, pricequery, pos_sig=22, neg_sig=-10, interval=5000):
         fig = plt.figure(figsize=(12, 8))
         self.ax1 = fig.add_subplot(1, 1, 1)
-        self.ax2 = self.ax1.twinx()
+        # self.ax2 = self.ax1.twinx()
+
+        self.pos_sig = pos_sig
+        self.neg_sig = neg_sig
+
         self.query = query
         self.pricequery = pricequery
 
@@ -553,7 +576,32 @@ class TweetAnalysis:
             damp_trades.close()
             print('file appended')
 
+        if not os.path.exists('Querydata/{}/{}_index.txt'.format(self.pricequery, date.today())):
+            index_prices = open(
+                'Querydata/{}/{}_index.txt'.format(self.pricequery, date.today()), 'w')
+
+            with open('index_price.txt', 'r') as file:
+                file = file.readlines()
+                for line in file:
+                    index_prices.write(line)
+
+            index_prices.close()
+            print('new file created')
+
+        else:
+            index_prices = open(
+                'Querydata/{}/{}_index.txt'.format(self.pricequery, date.today()), 'a')
+
+            with open('index_price.txt', 'r') as file:
+                file = file.readlines()
+                for line in file:
+                    index_prices.write(line)
+
+            index_prices.close()
+            print('file appended')
+
         # this erases txt content for next live chart
+        open('index_price.txt', 'w').close()
         open('stream_data.txt', 'w').close()
         open('trade_data.txt', 'w').close()
         open('damp_trades.txt', 'w').close()
@@ -564,4 +612,4 @@ if __name__ == '__main__':
     query = ('spx OR sp500 OR dax OR dax30 OR nasdaq OR djia OR dowjones OR nyse OR stocks OR equities OR investing')
 
     stream = TweetAnalysis()
-    stream.start_animation(query, '^GSPC')
+    stream.start_animation(query, '^GDAXI', interval=5000)
